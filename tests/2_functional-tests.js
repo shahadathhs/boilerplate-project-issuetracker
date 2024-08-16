@@ -8,7 +8,11 @@ const { ObjectId } = require("mongodb");
 chai.use(chaiHttp);
 
 suite("Functional Tests", function () {
+  this.timeout(5000);
   let currentIssueId;
+  let projectTitle;
+  let projectOpen;
+  let projectCreatedBy;
 
   suite("POST /api/issues/{project}", function () {
     // #1: Create an issue with every field
@@ -32,7 +36,10 @@ suite("Functional Tests", function () {
           assert.equal(res.body.status_text, "In Progress");
           assert.equal(res.body.open, true);
           assert.isString(res.body._id);
-          currentIssueId = res.body._id; // Store the issue ID
+          currentIssueId = res.body._id;
+          projectTitle = res.body.issue_title;
+          projectOpen = res.body.open;
+          projectCreatedBy = res.body.created_by;
           done();
         });
     });
@@ -82,10 +89,11 @@ suite("Functional Tests", function () {
     test("View issues on a project", function (done) {
       chai
         .request(server)
-        .get("/api/issues/test")
+        .get(`/api/issues/${projectTitle}`)
         .end(function (err, res) {
           assert.equal(res.status, 200);
           assert.isArray(res.body);
+          console.log("get", res.body);
           done();
         });
     });
@@ -94,10 +102,11 @@ suite("Functional Tests", function () {
     test("View issues on a project with one filter", function (done) {
       chai
         .request(server)
-        .get("/api/issues/test?open=true")
+        .get(`/api/issues/${projectTitle}?open=${projectOpen}`)
         .end(function (err, res) {
           assert.equal(res.status, 200);
           assert.isArray(res.body);
+          console.log("get 2", res.body);
           done();
         });
     });
@@ -106,10 +115,11 @@ suite("Functional Tests", function () {
     test("View issues on a project with multiple filters", function (done) {
       chai
         .request(server)
-        .get("/api/issues/test?open=true&created_by=Test User")
+        .get(`/api/issues/${projectTitle}?open=${projectOpen}&created_by=${projectCreatedBy}`)
         .end(function (err, res) {
           assert.equal(res.status, 200);
           assert.isArray(res.body);
+          console.log("get 3", res.body);
           done();
         });
     });
@@ -147,7 +157,6 @@ suite("Functional Tests", function () {
           open: false,
         })
         .end(function (err, res) {
-          console.log(res.body);
           assert.equal(res.status, 200);
           assert.equal(res.body.result, "successfully updated");
           done();
