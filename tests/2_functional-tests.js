@@ -2,12 +2,14 @@ const chaiHttp = require("chai-http");
 const chai = require("chai");
 const assert = chai.assert;
 const server = require("../server");
-const { suite } = require("mocha");
+const { suite, test } = require("mocha");
+const { ObjectId } = require("mongodb");
 
 chai.use(chaiHttp);
 
 suite("Functional Tests", function () {
-  
+  let currentIssueId;
+
   suite("POST /api/issues/{project}", function () {
     // #1: Create an issue with every field
     test("Create an issue with every field", function (done) {
@@ -30,6 +32,7 @@ suite("Functional Tests", function () {
           assert.equal(res.body.status_text, "In Progress");
           assert.equal(res.body.open, true);
           assert.isString(res.body._id);
+          currentIssueId = res.body._id; // Store the issue ID
           done();
         });
     });
@@ -117,12 +120,13 @@ suite("Functional Tests", function () {
     test("Update one field on an issue", function (done) {
       chai
         .request(server)
-        .put("/api/issues/test")
+        .put(`/api/issues/test`)
         .send({
-          _id: "valid_id", // Replace with a valid test ID
+          _id: new ObjectId(currentIssueId),
           issue_title: "Test Issue Updated",
         })
         .end(function (err, res) {
+          console.log(res.body);
           assert.equal(res.status, 200);
           assert.equal(res.body.result, "successfully updated");
           done();
@@ -133,9 +137,9 @@ suite("Functional Tests", function () {
     test("Update multiple fields on an issue", function (done) {
       chai
         .request(server)
-        .put("/api/issues/test")
+        .put(`/api/issues/test`)
         .send({
-          _id: "valid_id", // Replace with a valid test ID
+          _id: new ObjectId(currentIssueId),
           issue_title: "Test Issue Updated",
           issue_text: "Test Text Updated",
           created_by: "Test User Updated",
@@ -144,6 +148,7 @@ suite("Functional Tests", function () {
           open: false,
         })
         .end(function (err, res) {
+          console.log(res.body);
           assert.equal(res.status, 200);
           assert.equal(res.body.result, "successfully updated");
           done();
@@ -187,7 +192,7 @@ suite("Functional Tests", function () {
         .request(server)
         .put("/api/issues/test")
         .send({
-          _id: "invalid_id",
+          _id: '77bebfadf56ca12a99b06880',
           issue_title: "Test Issue Invalid _id",
         })
         .end(function (err, res) {
@@ -203,9 +208,9 @@ suite("Functional Tests", function () {
     test("Delete an issue", function (done) {
       chai
         .request(server)
-        .delete("/api/issues/test")
+        .delete(`/api/issues/test`)
         .send({
-          _id: "valid_id", // Replace with a valid test ID
+          _id: new ObjectId(currentIssueId),
         })
         .end(function (err, res) {
           assert.equal(res.status, 200);
@@ -220,7 +225,7 @@ suite("Functional Tests", function () {
         .request(server)
         .delete("/api/issues/test")
         .send({
-          _id: "invalid_id",
+          _id: new ObjectId('77bebfadf56ca12a99b06880'),
         })
         .end(function (err, res) {
           assert.equal(res.status, 200);

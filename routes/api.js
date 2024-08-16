@@ -5,7 +5,7 @@ module.exports = function (app) {
     // GET request to view issues on a project with optional filters
     .get(async function (req, res) {
       const project = req.params.project;
-      const filter = req.query;
+      const filter = { ...req.query, project };
 
       try {
         const issues = await Issue.find(filter).exec();
@@ -16,7 +16,7 @@ module.exports = function (app) {
     })
 
     // POST request to create an issue with every field
-    .post(async function (req, res) {
+    .post(async function (req, res) { 
       const project = req.params.project;
       const { issue_title, issue_text, created_by, assigned_to, status_text } = req.body;
 
@@ -24,7 +24,14 @@ module.exports = function (app) {
         return res.json({ error: 'required field(s) missing' });
       }
 
-      const newIssue = new Issue({ issue_title, issue_text, created_by, assigned_to, status_text });
+      const newIssue = new Issue({
+        issue_title,
+        issue_text,
+        created_by,
+        assigned_to,
+        status_text,
+        project,
+      });
 
       try {
         await newIssue.save();
@@ -54,10 +61,11 @@ module.exports = function (app) {
       }
 
       try {
-        const result = await Issue.findByIdAndUpdate(_id, { ...updateFields, updated_on: new Date() }, { new: true }).exec();
+        const result = await Issue.findOneAndUpdate({ _id, project }, { ...updateFields, updated_on: new Date() }, { new: true });
         if (!result) {
           return res.json({ error: 'could not update', _id });
         }
+        console.log(result);
         res.json({ result: 'successfully updated', _id });
       } catch (err) {
         res.status(500).json({ error: 'Internal Server Error' });
@@ -66,21 +74,18 @@ module.exports = function (app) {
 
     // DELETE request to delete an issue
     .delete(async function (req, res) {
-      const project = req.params.project;
       const { _id } = req.body;
-
       if (!_id) {
         return res.json({ error: 'missing _id' });
       }
-
-      try {
-        const result = await Issue.findByIdAndDelete(_id).exec();
-        if (!result) {
-          return res.json({ error: 'could not delete', _id });
-        }
-        res.json({ result: 'successfully deleted', _id });
-      } catch (err) {
-        res.status(500).json({ error: 'Internal Server Error' });
+      const issue = await Issue.find({_id});
+      if (!issue) {
+        return res.json({ error: 'could not delete', _id });
       }
+      const result = await Issue.deleteOne({ _id });
+      if (result.deletedCount === 0) {
+        return res.json({ error: 'could not delete', _id });
+      }
+      res.json({ result: 'successfully deleted', _id });
     });
 };
