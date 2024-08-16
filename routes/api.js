@@ -1,122 +1,86 @@
-'use strict';
-
-const issues = {};
-let currentId = 1;
+const Issue = require('../models/Issue');
 
 module.exports = function (app) {
-
   app.route('/api/issues/:project')
-    // GET request to view issues with or without filters
-    .get(function (req, res) {
+    // GET request to view issues on a project with optional filters
+    .get(async function (req, res) {
       const project = req.params.project;
       const filter = req.query;
 
-      if (!issues[project]) {
-        return res.json([]);
+      try {
+        const issues = await Issue.find(filter).exec();
+        res.json(issues);
+      } catch (err) {
+        res.status(500).json({ error: 'Internal Server Error' });
       }
-
-      let result = issues[project];
-
-      // Apply filters
-      for (const key in filter) {
-        if (filter.hasOwnProperty(key)) {
-          result = result.filter(issue => issue[key] === filter[key]);
-        }
-      }
-
-      res.json(result);
     })
-    
-    // POST request to create a new issue
-    .post(function (req, res) {
+
+    // POST request to create an issue with every field
+    .post(async function (req, res) {
       const project = req.params.project;
       const { issue_title, issue_text, created_by, assigned_to, status_text } = req.body;
 
-      // Validate required fields
       if (!issue_title || !issue_text || !created_by) {
         return res.json({ error: 'required field(s) missing' });
       }
 
-      const newIssue = {
-        _id: currentId++,
-        issue_title,
-        issue_text,
-        created_by,
-        assigned_to: assigned_to || '',
-        status_text: status_text || '',
-        created_on: new Date().toISOString(),
-        updated_on: new Date().toISOString(),
-        open: true
-      };
+      const newIssue = new Issue({ issue_title, issue_text, created_by, assigned_to, status_text });
 
-      if (!issues[project]) {
-        issues[project] = [];
+      try {
+        await newIssue.save();
+        res.json(newIssue);
+      } catch (err) {
+        res.status(500).json({ error: 'Internal Server Error' });
       }
-
-      issues[project].push(newIssue);
-
-      res.json(newIssue);
     })
-    
-    // PUT request to update an existing issue
-    .put(function (req, res) {
+
+    // PUT request to update one or multiple fields on an issue
+    .put(async function (req, res) {
       const project = req.params.project;
       const { _id, issue_title, issue_text, created_by, assigned_to, status_text, open } = req.body;
-    
+
       if (!_id) {
         return res.json({ error: 'missing _id' });
       }
-    
-      if (!issues[project]) {
-        return res.json({ error: 'project not found' });
-      }
-    
-      const issue = issues[project].find(issue => issue._id == _id);
-    
-      if (!issue) {
-        return res.json({ error: 'could not update', _id });
-      }
-    
-      // No fields to update
-      if (!issue_title && !issue_text && !created_by && !assigned_to && !status_text && typeof open === 'undefined') {
+
+      // Check if there are fields to update
+      const updateFields = { issue_title, issue_text, created_by, assigned_to, status_text, open };
+
+      // Remove fields with undefined values
+      Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);
+
+      if (Object.keys(updateFields).length === 0) {
         return res.json({ error: 'no update field(s) sent', _id });
       }
-    
-      // Update fields
-      issue.issue_title = issue_title || issue.issue_title;
-      issue.issue_text = issue_text || issue.issue_text;
-      issue.created_by = created_by || issue.created_by;
-      issue.assigned_to = assigned_to || issue.assigned_to;
-      issue.status_text = status_text || issue.status_text;
-      if (typeof open !== 'undefined') {
-        issue.open = open;
+
+      try {
+        const result = await Issue.findByIdAndUpdate(_id, { ...updateFields, updated_on: new Date() }, { new: true }).exec();
+        if (!result) {
+          return res.json({ error: 'could not update', _id });
+        }
+        res.json({ result: 'successfully updated', _id });
+      } catch (err) {
+        res.status(500).json({ error: 'Internal Server Error' });
       }
-      issue.updated_on = new Date().toISOString();
-    
-      res.json({ result: 'successfully updated', _id });
-    })    
-    
+    })
+
     // DELETE request to delete an issue
-    .delete(function (req, res) {
+    .delete(async function (req, res) {
       const project = req.params.project;
       const { _id } = req.body;
-    
+
       if (!_id) {
         return res.json({ error: 'missing _id' });
       }
-    
-      if (!issues[project]) {
-        return res.json({ error: 'project not found' });
+
+      try {
+        const result = await Issue.findByIdAndDelete(_id).exec();
+        if (!result) {
+          return res.json({ error: 'could not delete', _id });
+        }
+        res.json({ result: 'successfully deleted', _id });
+      } catch (err) {
+        res.status(500).json({ error: 'Internal Server Error' });
       }
-    
-      const index = issues[project].findIndex(issue => issue._id == _id);
-    
-      if (index === -1) {
-        return res.json({ error: 'could not delete', _id });
-      }
-    
-      issues[project].splice(index, 1);
-    
-      res.json({ result: 'successfully deleted', _id });
     });
 };
