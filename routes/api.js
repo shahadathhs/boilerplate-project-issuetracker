@@ -43,33 +43,20 @@ module.exports = function (app) {
 
     // PUT request to update one or multiple fields on an issue
     .put(async function (req, res) {
-      const project = req.params.project;
-      const { _id, issue_title, issue_text, created_by, assigned_to, status_text, open } = req.body;
+      const { _id, ...updateFields } = req.body;
 
-      if (!_id) {
-        return res.json({ error: 'missing _id' });
+      if (!_id) return res.json({ error: 'missing _id' });
+      if (Object.keys(updateFields).length === 0) return res.json({ error: 'no update field(s) sent' });
+
+      const issue = await Issue.find({_id});
+      if (!issue) {
+        return res.json({ error: 'could not delete', _id });
       }
-
-      // Check if there are fields to update
-      const updateFields = { issue_title, issue_text, created_by, assigned_to, status_text, open };
-
-      // Remove fields with undefined values
-      Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);
-
-      if (Object.keys(updateFields).length === 0) {
-        return res.json({ error: 'no update field(s) sent', _id });
+      const result = await Issue.updateOne({ _id }, { $set: { ...issue, updateFields }});
+      if (result.modifiedCount === 0) {
+        return res.json({ error: 'could not update', _id });
       }
-
-      try {
-        const result = await Issue.findOneAndUpdate({ _id, project }, { ...updateFields, updated_on: new Date() }, { new: true });
-        if (!result) {
-          return res.json({ error: 'could not update', _id });
-        }
-        console.log(result);
-        res.json({ result: 'successfully updated', _id });
-      } catch (err) {
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
+      res.json({ result: 'successfully updated', _id });
     })
 
     // DELETE request to delete an issue

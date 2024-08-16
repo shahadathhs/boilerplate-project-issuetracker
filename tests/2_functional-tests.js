@@ -126,7 +126,6 @@ suite("Functional Tests", function () {
           issue_title: "Test Issue Updated",
         })
         .end(function (err, res) {
-          console.log(res.body);
           assert.equal(res.status, 200);
           assert.equal(res.body.result, "successfully updated");
           done();
